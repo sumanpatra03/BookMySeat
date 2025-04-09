@@ -17,7 +17,7 @@ export default function RoomManagementPage({
   const [users, setUsers] = useState<any[]>([]);
   const [selectedSeat, setSelectedSeat] = useState<{
     row: number;
-    column: number;
+    columns: number;
   } | null>(null);
   const [selectedUserId, setSelectedUserId] = useState("");
   const router = useRouter();
@@ -29,69 +29,99 @@ export default function RoomManagementPage({
   }, [id]);
 
   const fetchRoom = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("rooms")
       .select("*")
       .eq("id", id)
       .single();
+    if (error) console.error("Room fetch error:", error);
     setRoom(data);
   };
 
   const fetchSeats = async () => {
-    const { data } = await supabase.from("seats").select("*").eq("room_id", id);
+    const { data, error } = await supabase
+      .from("seats")
+      .select("*, users(name)")
+      .eq("room_id", id);
+
+    if (error) console.error("Seats fetch error:", error);
     setSeats(data || []);
   };
 
   const fetchUsers = async () => {
-    const { data } = await supabase.from("users").select("*");
+    const { data, error } = await supabase.from("users").select("*");
+    if (error) console.error("Users fetch error:", error);
     setUsers(data || []);
   };
 
-  const handleSeatClick = (row: number, column: number) => {
-    setSelectedSeat({ row, column });
-    const seat = seats.find((s) => s.row === row && s.column === column);
+  const handleSeatClick = (row: number, columns: number) => {
+    setSelectedSeat({ row, columns });
+    const seat = seats.find((s) => s.row === row && s.columns === columns);
     setSelectedUserId(seat?.user_id || "");
   };
 
   const handleAllocate = async () => {
     if (!selectedSeat) return;
 
-    const { row, column } = selectedSeat;
+    const { row, columns } = selectedSeat;
+    const now = new Date().toISOString();
+
     const existingSeat = seats.find(
-      (s) => s.row === row && s.column === column
+      (s) => s.row === row && s.columns === columns
     );
 
     if (selectedUserId) {
       if (existingSeat) {
-        await supabase
+        const { error } = await supabase
           .from("seats")
-          .update({ user_id: selectedUserId, status: "allocated" })
+          .update({
+            user_id: selectedUserId,
+            status: "allocated",
+            updated_at: now,
+          })
           .eq("id", existingSeat.id);
+
+        if (error) console.error("Update seat error:", error);
       } else {
-        await supabase
-          .from("seats")
-          .insert([
-            {
-              room_id: id,
-              row,
-              column,
-              user_id: selectedUserId,
-              status: "allocated",
-            },
-          ]);
+        const { error } = await supabase.from("seats").insert([
+          {
+            room_id: id,
+            row,
+            columns,
+            user_id: selectedUserId,
+            status: "allocated",
+            inserted_at: now,
+            updated_at: now,
+          },
+        ]);
+        if (error) console.error("Insert seat error:", error);
       }
     } else {
       if (existingSeat) {
-        await supabase
+        const { error } = await supabase
           .from("seats")
-          .update({ user_id: null, status: "unavailable" })
+          .update({
+            user_id: null,
+            status: "unavailable",
+            updated_at: now,
+          })
           .eq("id", existingSeat.id);
+
+        if (error) console.error("Update (unavailable) error:", error);
       } else {
-        await supabase
-          .from("seats")
-          .insert([
-            { room_id: id, row, column, user_id: null, status: "unavailable" },
-          ]);
+        const { error } = await supabase.from("seats").insert([
+          {
+            room_id: id,
+            row,
+            columns,
+            user_id: null,
+            status: "unavailable",
+            inserted_at: now,
+            updated_at: now,
+          },
+        ]);
+
+        if (error) console.error("Insert (unavailable) error:", error);
       }
     }
 
@@ -103,10 +133,12 @@ export default function RoomManagementPage({
     if (!selectedSeat) return;
 
     const seat = seats.find(
-      (s) => s.row === selectedSeat.row && s.column === selectedSeat.column
+      (s) => s.row === selectedSeat.row && s.columns === selectedSeat.columns
     );
+
     if (seat) {
-      await supabase.from("seats").delete().eq("id", seat.id);
+      const { error } = await supabase.from("seats").delete().eq("id", seat.id);
+      if (error) console.error("Delete seat error:", error);
       await fetchSeats();
     }
     setSelectedSeat(null);
@@ -120,7 +152,7 @@ export default function RoomManagementPage({
     );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br  from-gray-900 via-gray-800 to-black p-8 backdrop-blur-xl">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black p-8 backdrop-blur-xl">
       <div className="max-w-6xl mx-auto space-y-8">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-white">
@@ -149,9 +181,9 @@ export default function RoomManagementPage({
                 {Array.from({ length: room.rows * room.columns }).map(
                   (_, index) => {
                     const row = Math.floor(index / room.columns) + 1;
-                    const column = (index % room.columns) + 1;
+                    const columns = (index % room.columns) + 1;
                     const seat = seats.find(
-                      (s) => s.row === row && s.column === column
+                      (s) => s.row === row && s.columns === columns
                     );
 
                     let bgColor = "bg-green-200 hover:bg-green-300";
@@ -160,18 +192,17 @@ export default function RoomManagementPage({
 
                     const isSelected =
                       selectedSeat?.row === row &&
-                      selectedSeat?.column === column;
-                    if (isSelected)
-                      bgColor = "bg-blue-400 ring-2 ring-blue-600";
+                      selectedSeat?.columns === columns;
+                    if (isSelected) bgColor = "bg-blue-400 ring-2 ring-blue-600";
 
                     return (
                       <button
                         key={index}
-                        onClick={() => handleSeatClick(row, column)}
+                        onClick={() => handleSeatClick(row, columns)}
                         className={`w-10 h-10 text-sm font-medium text-gray-800 rounded-md flex items-center justify-center transition ${bgColor}`}
-                        title={`Row ${row}, Column ${column}`}
+                        title={`Row ${row}, Column ${columns}`}
                       >
-                        {seat?.user_name?.[0] || ""}
+                        {seat?.users?.name?.[0] || ""}
                       </button>
                     );
                   }
@@ -187,8 +218,8 @@ export default function RoomManagementPage({
             {selectedSeat ? (
               <>
                 <p className="text-white/80 mb-4">
-                  Managing seat at <strong>Row {selectedSeat.row}</strong>,
-                  Column <strong>{selectedSeat.column}</strong>
+                  Managing seat at <strong>Row {selectedSeat.row}</strong>, Column{" "}
+                  <strong>{selectedSeat.columns}</strong>
                 </p>
                 <label className="block text-sm font-medium text-white mb-1">
                   Assign User
@@ -200,11 +231,7 @@ export default function RoomManagementPage({
                 >
                   <option value="">-- Select User --</option>
                   {users.map((user) => (
-                    <option
-                      key={user.id}
-                      value={user.id}
-                      className="text-black"
-                    >
+                    <option key={user.id} value={user.id} className="text-black">
                       {user.name}
                     </option>
                   ))}

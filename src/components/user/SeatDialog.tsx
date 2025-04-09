@@ -27,7 +27,7 @@ export default function SeatDialog({ room, isOpen, onClose }: SeatDialogProps) {
         .from('seats')
         .select('*')
         .eq('room_id', room.id)
-      
+
       if (error) throw error
       setSeats(data || [])
     } catch (error) {
@@ -37,11 +37,19 @@ export default function SeatDialog({ room, isOpen, onClose }: SeatDialogProps) {
     }
   }
 
+  const getSeatStatus = (row: number, column: number) => {
+    const seat = seats.find(s => s.row === row && s.column === column)
+    if (!seat) return { color: 'bg-green-500', label: '' } // available
+    if (seat.status === 'allocated') return { color: 'bg-gray-500', label: seat.user_name?.charAt(0) || '' }
+    if (seat.status === 'unavailable') return { color: 'bg-white', label: '' }
+    return { color: 'bg-yellow-500', label: '' } // not_allotted or other
+  }
+
   if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-auto">
+      <div className="bg-white rounded-lg p-6 max-w-5xl w-full max-h-[90vh] overflow-auto">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-semibold">{room.name} - Seat Availability</h3>
           <button
@@ -51,44 +59,36 @@ export default function SeatDialog({ room, isOpen, onClose }: SeatDialogProps) {
             ✕
           </button>
         </div>
-        
+
         {isLoading ? (
           <div className="flex justify-center py-8">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
           </div>
         ) : (
-          <div className="flex justify-center">
-            <div 
-              className="grid gap-1"
-              style={{
-                gridTemplateColumns: `repeat(${room.columns}, minmax(0, 1fr))`
-              }}
-            >
+          <div className="flex justify-center overflow-auto">
+            <div className="grid gap-2" style={{
+              gridTemplateColumns: `repeat(${room.columns}, 32px)`
+            }}>
               {Array.from({ length: room.rows * room.columns }).map((_, index) => {
                 const row = Math.floor(index / room.columns) + 1
-                const col = (index % room.columns) + 1
-                const seat = seats.find(s => s.row === row && s.column === col)
-                
-                let bgColor = 'bg-green-500' // Available
-                if (seat) {
-                  bgColor = seat.status === 'allocated' ? 'bg-gray-500' : 'bg-yellow-500'
-                }
-                
+                const column = (index % room.columns) + 1
+                const { color, label } = getSeatStatus(row, column)
+
                 return (
                   <div
-                    key={index}
-                    className={`w-8 h-8 rounded-full ${bgColor} flex items-center justify-center text-xs text-white`}
-                    title={`Row ${row}, Col ${col}`}
+                    key={`r${row}-c${column}`}
+                    className={`w-8 h-8 rounded-md ${color} text-white text-sm flex items-center justify-center border`}
+                    title={`Row ${row}, Column ${column}`}
                   >
-                    {seat?.user_name ? seat.user_name.charAt(0) : ''}
+                    {label || column}
                   </div>
                 )
               })}
             </div>
           </div>
         )}
-        
-        <div className="mt-6 flex justify-end space-x-2">
+
+        <div className="mt-6 flex justify-end">
           <button
             onClick={onClose}
             className="px-4 py-2 bg-gray-300 rounded-md hover:bg-gray-400"

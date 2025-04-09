@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@bitpod/p10-react-seat-picker": "^0.0.23",
     "@headlessui/react": "^2.2.1",
     "@radix-ui/react-dialog": "^1.1.7",
     "@supabase/supabase-js": "^2.49.4",
@@ -17,7 +18,9 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hot-toast": "^2.5.2",
-    "react-seatmap": "^0.1.2"
+    "react-seatmap": "^0.1.2",
+    "react-tooltip": "^5.28.1",
+    "react-transition-group": "^4.4.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -25,6 +28,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/react-transition-group": "^4.4.12",
     "eslint": "^9",
     "eslint-config-next": "15.2.4",
     "tailwindcss": "^4",
